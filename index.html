@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Student Scholarship Monitoring &amp; Academic Compliance System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">Scholarship Monitoring &amp; Academic Compliance</div>
+  <div class="topbar-right">
+    <span class="chip" id="deadlineChip">Deadline</span>
+    <span class="chip" id="backendChip">Local storage</span>
+    <label>Role
+      <select id="roleSwitcher">
+        <option value="scholar">Scholar View</option>
+        <option value="staff">Scholarship Staff View</option>
+      </select>
+    </label>
+    <label>Scholar
+      <select id="scholarSelector"></select>
+    </label>
+  </div>
+</header>
+
+<main id="appMain">
+  <p class="role-hint" id="roleHint"></p>
+
+  <section id="scholarView" class="view">
+    <h2>Academic Performance &amp; Evidence Submission</h2>
+    <div class="card policy-strip" id="scholarMeta"></div>
+    <form id="submissionForm" class="card" novalidate>
+      <div class="grid">
+        <label>Academic Year <input type="text" id="ay" value="2026-2027" placeholder="2026-2027" required /></label>
+        <label>Semester <input type="text" id="sem" value="1st Semester" placeholder="1st Semester" required /></label>
+        <label>Cumulative GWA <input type="number" id="gwa" min="1.00" max="5.00" step="0.01" placeholder="1.50" required /></label>
+        <label>Total Enrolled Units <input type="number" id="units" min="1" step="1" placeholder="21" required /></label>
+        <label>Failed Subjects <input type="number" id="failed" min="0" step="1" value="0" required /></label>
+        <label>INC Subjects <input type="number" id="inc" min="0" step="1" value="0" required /></label>
+        <label>Dropped Subjects <input type="number" id="dropped" min="0" step="1" value="0" required /></label>
+        <label>Proof URL <input type="url" id="proof" placeholder="https://drive.google.com/…" required /></label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" id="submitBtn">Submit Evidence</button>
+        <button type="button" class="ghost" id="resetForm">Reset</button>
+      </div>
+      <p id="formMsg" class="msg" role="status" aria-live="polite"></p>
+    </form>
+
+    <h2>Submission History</h2>
+    <div class="table-wrap card">
+      <table>
+        <thead>
+          <tr>
+            <th>AY/Sem</th><th>GWA</th><th>Units</th><th>F/INC/DR</th><th>Proof</th>
+            <th>Verification</th><th>Compliance</th><th>Renewal</th><th>Submitted At</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="staffView" class="view hidden">
+    <div class="metrics">
+      <div class="card metric"><span>Total Assigned Scholars</span><strong id="mAssigned">0</strong></div>
+      <div class="card metric"><span>Pending Verification</span><strong id="mPending">0</strong></div>
+      <div class="card metric"><span>Compliant</span><strong id="mCompliant">0</strong></div>
+      <div class="card metric"><span>With Deficiency</span><strong id="mDef">0</strong></div>
+      <div class="card metric"><span>Renewals Approved</span><strong id="mApproved">0</strong></div>
+      <div class="card metric"><span>Returned</span><strong id="mReturned">0</strong></div>
+    </div>
+
+    <details class="card connection">
+      <summary>Backend Connection &amp; Data</summary>
+      <div class="connection-body">
+        <p class="muted">
+          The system runs on browser storage by default and works offline. Connect a Supabase project to
+          share records across devices — run <code>supabase/schema.sql</code> in the Supabase SQL editor first.
+        </p>
+        <div class="grid">
+          <label>Supabase Project URL <input type="text" id="supabaseUrl" placeholder="https://xxxx.supabase.co" /></label>
+          <label>Supabase Anon Key <input type="text" id="supabaseAnonKey" placeholder="eyJhbGciOi..." /></label>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="connectBtn">Connect</button>
+          <button type="button" class="ghost" id="disconnectBtn" disabled>Disconnect</button>
+          <button type="button" class="ghost" id="uploadScholarsBtn">Upload Scholars</button>
+          <button type="button" class="ghost" id="refreshBtn">Refresh</button>
+          <button type="button" class="ghost danger" id="resetDataBtn">Reset Demo Data</button>
+        </div>
+      </div>
+    </details>
+
+    <div class="filters card">
+      <input type="search" id="search" placeholder="Search name, ID, or program" />
+      <select id="policyFilter"><option value="">All Policies</option><option value="Merit Scholar">Merit Scholar</option><option value="Community Scholar">Community Scholar</option></select>
+      <select id="statusFilter">
+        <option value="">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="Verified">Verified</option>
+        <option value="Returned">Returned</option>
+        <option value="Compliant">Compliant</option>
+        <option value="With Deficiency">With Deficiency</option>
+        <option value="Approved">Renewal Approved</option>
+        <option value="Held">Renewal Held</option>
+      </select>
+      <button type="button" class="ghost" id="clearFilters">Clear Filters</button>
+    </div>
+
+    <div class="table-wrap card">
+      <table>
+        <thead>
+          <tr>
+            <th>Scholar</th><th>Policy</th><th>AY/Sem</th><th>GWA</th><th>Units</th><th>F/INC/DR</th>
+            <th>Verification</th><th>Compliance</th><th>Renewal</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="staffBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div id="verifyModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="verifyTitle" aria-hidden="true">
+  <div class="modal-content card">
+    <h3 id="verifyTitle">Review Evidence</h3>
+    <div id="verifyInfo" class="details"></div>
+    <div id="verifyStatus"></div>
+    <div class="modal-actions">
+      <button type="button" id="btnVerify">Mark Verified</button>
+      <button type="button" class="ghost" id="btnEvaluateFromModal">Run Evaluation</button>
+      <button type="button" class="warn-btn" id="btnReturn">Return with Feedback</button>
+    </div>
+    <label>Feedback for the scholar
+      <textarea id="returnFeedback" placeholder="Required when returning a submission"></textarea>
+    </label>
+    <button type="button" class="ghost" id="closeVerify">Close</button>
+  </div>
+</div>
+
+<div id="renewalModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="renewalTitle" aria-hidden="true">
+  <div class="modal-content card">
+    <h3 id="renewalTitle">Record Renewal Decision</h3>
+    <div id="renewalInfo" class="details"></div>
+    <label>Decision
+      <select id="renewalDecision">
+        <option value="Approved">Approved</option>
+        <option value="Held">Held</option>
+      </select>
+    </label>
+    <label>Note (optional)
+      <textarea id="renewalNote" placeholder="Conditions, follow-up actions, or justification"></textarea>
+    </label>
+    <div class="modal-actions">
+      <button type="button" id="submitRenewal">Submit Decision</button>
+      <button type="button" class="ghost" id="closeRenewal">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" class="toast-wrap" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
